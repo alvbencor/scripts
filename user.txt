@@ -1,0 +1,83 @@
+
+import os 
+# ===================== CONFIG (fija por entorno) =====================
+ENTORNOS = {
+    "dev": {
+        "inventory": "",
+        "admin_email": "",
+        "admin_pass": "",
+    },
+    "pre": {
+        "inventory": "",
+        "admin_email": "",
+        "admin_pass": "",
+    },
+    "pro": {
+        "inventory": "",
+        "admin_email": "",
+        "admin_pass": "",
+    },
+}
+ORG_NAME = ""
+VAULT_FILE = ""
+EXTRA_VARS_FILE = ""
+PYTHON_INTERPRETER = ""
+# =====================================================================
+
+
+def pedir_no_vacio(texto):
+    valor = ""
+    while not valor:
+        valor = input(texto).strip()
+    return valor
+
+
+env = ""
+while env not in ENTORNOS:
+    env = input("Entorno (dev/pre/pro): ").strip().lower()
+
+user_email = pedir_no_vacio("Email del usuario: ")
+user_pass = pedir_no_vacio("Contraseña del usuario: ")
+role = pedir_no_vacio("Rol: ")
+
+cfg = ENTORNOS[env]
+if cfg["admin_pass"].startswith("CAMBIAR_"):
+    print("AVISO: la contraseña de admin de '" + env + "' no está configurada.")
+
+common = (
+    "-i " + cfg["inventory"]
+    + " --vault-password-file " + VAULT_FILE
+    + ' -e "' + EXTRA_VARS_FILE + '"'
+)
+admin_vars = (
+    "admin_email=" + cfg["admin_email"]
+    + " admin_passwd=" + cfg["admin_pass"]
+    + " org_name=" + ORG_NAME
+)
+
+texto = (
+    "################ " + env.upper() + " ################\n\n"
+    "# Borrar\n"
+    "ansible-playbook user-delete.yml " + common
+    + ' -e "' + admin_vars + " user_email=" + user_email + '" -b\n\n'
+    "# Crear\n"
+    "ansible-playbook user-create.yml " + common
+    + ' -e "ansible_python_interpreter=' + PYTHON_INTERPRETER + '"'
+    + ' -e "' + admin_vars + " user_email=" + user_email
+    + " user_passwd=" + user_pass + '" -b\n\n'
+    "# Asignar rol\n"
+    "ansible-playbook role-apply-user.yml " + common
+    + ' -e "' + admin_vars + " user_email=" + user_email
+    + " role_name=" + role + '" -b\n'
+)
+
+carpeta = os.path.join(os.path.dirname(os.path.abspath(__file__)), ORG_NAME)
+os.makedirs(carpeta, exist_ok=True)
+
+nombre = user_email.split("@")[0] + "_" + role + ".txt"
+ruta = os.path.join(carpeta, nombre)
+with open(ruta, "w", encoding="utf-8") as f:
+    f.write(texto)
+
+print("\n" + texto)
+print("Guardado en: " + ruta)
